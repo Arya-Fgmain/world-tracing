@@ -43,6 +43,9 @@ import torch
 
 HF_REPOS = {
     "r75b": "haoz19/object-model-6layer",
+    # Legacy 504x504 scene model. Superseded by the stronger 840x840 r69l
+    # below (the documented/default scene model); kept here so older configs
+    # still resolve, but no longer surfaced in the README / examples.
     "r69e": "haoz19/scene-model-6layer",
     "r69g": "haoz19/scene-model-6layer",
     # Mix-training scene model (r69g_v2_lance_mix = r69e + 12-dataset Lance

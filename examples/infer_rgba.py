@@ -25,8 +25,8 @@ Hand-picked object samples live under ``examples/test_images/object/``;
 see ``examples/test_images/README.md`` for the full list and provenance.
 
 The example targets the ``r75b`` config -- the object model.  Pass
-``--config r69e`` or ``--config r76`` for the scene / dynamic models.
-``--ckpt`` accepts a bare config name (``r75b`` / ``r69e`` / ``r76``)
+``--config r69l`` or ``--config r76`` for the scene / dynamic models.
+``--ckpt`` accepts a bare config name (``r75b`` / ``r69l`` / ``r76``)
 which downloads the released weights from Hugging Face Hub, an explicit
 ``hf://owner/repo`` URI, or a local checkpoint path.
 """

@@ -387,7 +387,7 @@ def inference_diffusion_multiview(
 ) -> tuple[torch.Tensor | None, torch.Tensor, torch.Tensor | None]:
     """Multi-view counterpart of :func:`inference_diffusion`.
 
-    The release scene model ``r69e_v2_evermotion_ithappy_504`` is multi-view
+    The release scene model ``r69l_v2_evermotion_ithappy_840_opp`` is multi-view
     and uses this function.  ``rgb_mv`` has shape ``[B, V, 3, H, W]``; ``V``
     views are folded into the leading batch dim so the model sees an
     effective batch ``B*V``, with ``conditioning["num_view"] = V`` threading

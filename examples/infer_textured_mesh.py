@@ -84,13 +84,13 @@ def main():
         type=str,
         help=(
             "Checkpoint -- one of: hf://owner/repo, a bare config name "
-            "(`r75b`, `r69e`, `r76`) for the default HF repo, or a local "
+            "(`r75b`, `r69l`, `r76`) for the default HF repo, or a local "
             "path to a .pt / .safetensors file."
         ),
     )
     p.add_argument(
         "--config",
-        choices=("r75b", "r69e", "r76"),
+        choices=("r75b", "r69l", "r76"),
         default="r75b",
         help="Model config (default: r75b -- the object model).",
     )

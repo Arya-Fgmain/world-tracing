@@ -358,8 +358,9 @@ def preprocess_rgba_for_model(
     Args:
         rgba_uint8: ``H×W×4`` uint8 RGBA image.  Alpha channel doubles as the
             object mask (foreground ⇔ alpha > 127).
-        image_size: target square resolution (the three release configs use
-            ``504`` for r75b/r69e and ``336`` for r76).
+        image_size: target square resolution (the release configs use
+            ``504`` for r75b, ``840`` for the scene model r69l, and ``336``
+            for r76).
         num_layers: model ``num_layers`` (e.g. 6).
         intrinsics_override: optional ``[3, 3]`` K at the *original*
             resolution.  Defaults to :func:`make_default_intrinsics`.

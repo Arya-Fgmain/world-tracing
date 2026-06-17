@@ -7,7 +7,7 @@ used to produce the final pair-comparison clips in our paper-demo viewer.
 | Category | Source |
 | --- | --- |
 | `object/`  | Generated RGBA assets (1376×768, RGBA PNG) |
-| `scene/`   | r69e training-set scenes (504×504, RGBA PNG, alpha=255) |
+| `scene/`   | scene-model training-set scenes (504×504, RGBA PNG, alpha=255) |
 | `dynamic/` | 16-frame clips evenly subsampled from DAVIS / Consistent4D / human-dynamic |
 
 Each category mixes a small "tier-1" set of visually striking examples
@@ -43,10 +43,10 @@ python examples/infer_rgba.py \
     --ckpt  /path/to/r75b_spikeskip_hardaug.pt \
     --out   /tmp/obj014.rrd
 
-# Scene (r69e); for outdoor scenes with large sky, pre-mask the sky externally
+# Scene (r69l); for outdoor scenes with large sky, pre-mask the sky externally
 python examples/infer_scene.py \
     --image examples/test_images/scene/scene_outdoor_14_brooklyn_apartment__seed61.png \
-    --ckpt  /path/to/r69e_v2_evermotion_ithappy_504.pt \
+    --ckpt  /path/to/r69l_v2_evermotion_ithappy_840_opp.pt \
     --out   /tmp/scene_brooklyn.rrd
 
 # Dynamic (r76)

@@ -71,20 +71,17 @@ The released checkpoints are hosted on **Hugging Face Hub**:
 | config name | task | image size | params | Hugging Face repo |
 | --- | --- | --- | --- | --- |
 | `r75b` | object | 504 × 504 | 1.7 B | [`haoz19/object-model-6layer`](https://huggingface.co/haoz19/object-model-6layer) |
-| `r69e` | scene | 504 × 504 | 1.5 B | [`haoz19/scene-model-6layer`](https://huggingface.co/haoz19/scene-model-6layer) |
-| `r69l` | scene (high-res) | 840 × 840 | 1.5 B | [`haoz19/scene-model-6layer-840`](https://huggingface.co/haoz19/scene-model-6layer-840) |
+| `r69l` | scene | 840 × 840 | 1.5 B | [`haoz19/scene-model-6layer-840`](https://huggingface.co/haoz19/scene-model-6layer-840) |
 | `r76`  | dynamic object (16 frames) | 336 × 336 | 2.1 B | [`haoz19/dynamic-model-16frame`](https://huggingface.co/haoz19/dynamic-model-16frame) |
 
-> **Checkpoint update — 2026-06-13:** the high-resolution scene model
-> `r69l` (config `r69l`, repo
-> [`haoz19/scene-model-6layer-840`](https://huggingface.co/haoz19/scene-model-6layer-840))
-> was refreshed to the latest `r69l_v2_evermotion_ithappy_840_opp` weights
-> (iter 50 000). This is the same checkpoint that now powers the Scene tab of
-> the [interactive demo](https://huggingface.co/spaces/haoz19/world-tracing-demo).
-> `r69l` is the warm-resumed, 840 × 840 fine-tune of the 504-res `r69e`
-> scene model — it must be run at 840 (the `r69l` config in
-> `wt/checkpoint.py` handles this); feeding it 504-res inputs is heavily
-> out-of-distribution.
+> **Scene model — `r69l` (840 × 840).** The released scene model is the
+> high-resolution `r69l` checkpoint
+> ([`haoz19/scene-model-6layer-840`](https://huggingface.co/haoz19/scene-model-6layer-840),
+> `r69l_v2_evermotion_ithappy_840_opp`). This is the same checkpoint that
+> powers the Scene tab of the
+> [interactive demo](https://huggingface.co/spaces/haoz19/world-tracing-demo).
+> It must be run at 840 × 840 (the `r69l` config in `wt/checkpoint.py`
+> handles this); feeding it 504-res inputs is heavily out-of-distribution.
 
 Pass `--ckpt <config-name>` (e.g. `--ckpt r75b`) and `wt` will fetch the
 weights from the Hub on first use and cache them under
@@ -154,13 +151,13 @@ a binary alpha; pass `--no-auto-alpha` to disable that.
 > time and makes it obvious how each layer carves out the occluded
 > geometry behind the previous one.
 
-### 2. Scene RGB (`r69e`)
+### 2. Scene RGB (`r69l`)
 
 ```bash
 python examples/infer_scene.py \
     --image  examples/test_images/scene/scene_outdoor_14_brooklyn_apartment__seed61.png \
-    --ckpt   r69e \
-    --config r69e \
+    --ckpt   r69l \
+    --config r69l \
     --out    /tmp/wt_scene.rrd
 ```
 
@@ -268,7 +265,7 @@ The released models predict **per-layer geometry only**:
 
 | name | shape | meaning |
 | --- | --- | --- |
-| `xyz_pred` | ``[B, L, H, W, 3]`` | Per-layer XYZ in camera space (metric units for `r75b` / `r76`; relative scale for `r69e` median-log) |
+| `xyz_pred` | ``[B, L, H, W, 3]`` | Per-layer XYZ in camera space (metric units for `r75b` / `r76`; relative scale for `r69l` median-log) |
 
 The per-layer validity mask is taken from the input alpha (the model's
 output is unmasked geometry over the full grid); per-pixel colour is
@@ -315,7 +312,7 @@ wt/                       ← installable Python package
 
 examples/
 ├── infer_rgba.py         ← Single RGBA image (object model; 4-seed sweep by default)
-├── infer_scene.py        ← Single scene RGB (r69e; 4-seed sweep by default)
+├── infer_scene.py        ← Single scene RGB (r69l; 4-seed sweep by default)
 ├── infer_video.py        ← Dynamic clip (r76; 4-seed sweep by default)
 └── infer_textured_mesh.py ← Image → multilayer geometry → TRELLIS.2 stages 2+3 → textured GLB (4-seed sweep by default)
 ```
@@ -327,7 +324,7 @@ Tested on a single NVIDIA A100 / H100 (80 GB) with bfloat16 autocast.
 | Config | Image size | Inference time (20 steps) |
 | --- | --- | --- |
 | `r75b`  | 504 × 504           | ~13 s / image |
-| `r69e`  | 504 × 504           | ~12 s / image |
+| `r69l`  | 840 × 840           | ~17 s / image |
 | `r76`   | 336 × 336 × 8 frames | ~30 s / clip  |
 
 The default 4-seed sweep is therefore ~4× the single-seed numbers above.
@@ -336,7 +333,7 @@ smaller resolution.
 
 ## Roadmap
 
-* **More published checkpoints.**  Updated `r75b` / `r69e` / `r76` from
+* **More published checkpoints.**  Updated `r75b` / `r69l` / `r76` from
   later training rounds, and a single-image multi-view variant.
 
 ## Citation

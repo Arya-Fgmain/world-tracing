@@ -8,20 +8,20 @@ Usage
     # default: 4-seed sweep (seeds 42,43,44,45), spread along +X in one .rrd
     python examples/infer_scene.py \
         --image examples/test_images/scene/scene_outdoor_14_brooklyn_apartment__seed61.png \
-        --ckpt  hf://haoz19/scene-model-6layer \
+        --ckpt  hf://haoz19/scene-model-6layer-840 \
         --out   /tmp/wt_scene.rrd
 
     # single deterministic seed (fastest path)
     python examples/infer_scene.py \
         --image examples/test_images/scene/scene_outdoor_14_brooklyn_apartment__seed61.png \
-        --ckpt  hf://haoz19/scene-model-6layer \
+        --ckpt  hf://haoz19/scene-model-6layer-840 \
         --seed  7 \
         --out   /tmp/wt_scene.rrd
 
 Hand-picked scene samples live under ``examples/test_images/scene/`` --
 see ``examples/test_images/README.md``.
 
-The scene model (``r69e``) was trained on full-frame indoor renders.
+The scene model (``r69l``, 840 x 840) was trained on full-frame indoor renders.
 By default this script treats the whole image as foreground (no
 center-crop, no auto-matting); the released scene model was trained on
 indoor renders without sky, so for outdoor images with large sky regions
@@ -62,14 +62,14 @@ def main():
         help=(
             "Checkpoint -- a local .pt path, an HF shorthand "
             "``hf://owner/repo``, or a bare config name "
-            "(``r69e`` recommended for scene mode)."
+            "(``r69l`` recommended for scene mode)."
         ),
     )
     p.add_argument(
         "--config",
-        choices=("r69e", "r75b", "r76"),
-        default="r69e",
-        help="Model config (default: r69e -- the scene model)",
+        choices=("r69l", "r69e", "r75b", "r76"),
+        default="r69l",
+        help="Model config (default: r69l -- the 840x840 scene model)",
     )
     p.add_argument(
         "--out", type=Path, default=Path("infer_scene.rrd"), help="Output .rrd"

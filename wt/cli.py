@@ -79,7 +79,7 @@ def add_common_args(p: argparse.ArgumentParser, default_out: str) -> None:
         help=(
             "Checkpoint -- one of: a local path to a .pt / .safetensors "
             "file, an HF shorthand ``hf://owner/repo[/file.pt]``, or a "
-            "bare config name (``r75b``, ``r69e``, ``r76``) which "
+            "bare config name (``r75b``, ``r69l``, ``r76``) which "
             "downloads the released weights from Hugging Face Hub."
         ),
     )

@@ -31,7 +31,7 @@ frame), so scrubbing through it animates the predicted point cloud over
 time.  Open with ``rerun /tmp/wt_video.rrd``.
 
 This entry point only makes sense with the ``r76`` config (which has the
-temporal-attention blocks); ``r75b`` / ``r69e`` are still accepted but
+temporal-attention blocks); ``r75b`` / ``r69l`` are still accepted but
 behave identically to running ``infer_rgba.py`` once per frame.
 """
 
