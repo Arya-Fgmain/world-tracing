@@ -110,6 +110,12 @@ def main():
         help="Optional .npz path to save raw multilayer XYZ and masks.",
     )
     p.add_argument(
+        "--voxel-npz",
+        type=Path,
+        default=None,
+        help="Optional .npz path to save voxel grids before/after morphology.",
+    )
+    p.add_argument(
         "--seed",
         type=int,
         default=None,
@@ -156,6 +162,18 @@ def main():
         type=int,
         default=4,
         help="Interior samples per layer-pair during ray densification.",
+    )
+    p.add_argument(
+        "--close-iters",
+        type=int,
+        default=1,
+        help="Binary-closing iterations during voxelization (default: 1).",
+    )
+    p.add_argument(
+        "--fill-holes",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Fill enclosed voxel regions (default: enabled).",
     )
     p.add_argument(
         "--max-voxels",
@@ -244,6 +262,11 @@ def main():
             if args.npz is not None
             else None
         )
+        voxel_npz_path = (
+            _seed_path(args.voxel_npz, seed, len(seeds))
+            if args.voxel_npz is not None
+            else None
+        )
         print(f"\n[wt] === seed {seed} ===")
 
         torch.manual_seed(seed)
@@ -311,15 +334,36 @@ def main():
             )
             continue
         tf = compute_canonical_transform(cloud_cam, half_target=0.45)
+        voxel_diagnostics = {} if voxel_npz_path is not None else None
         coords_xyz, n_vox = v4_ray_fill(
             xyz_np,
             mask_np,
             tf.apply,
             res=args.ss_res,
             ray_steps=args.ray_steps,
+            close_iters=args.close_iters,
+            fill_holes=args.fill_holes,
             max_voxels=args.max_voxels,
             seed=seed,
+            diagnostics=voxel_diagnostics,
         )
+        if voxel_npz_path is not None:
+            voxel_npz_path.parent.mkdir(parents=True, exist_ok=True)
+            np.savez_compressed(
+                voxel_npz_path,
+                **voxel_diagnostics,
+                close_iters=np.int64(args.close_iters),
+                fill_holes=np.bool_(args.fill_holes),
+                resolution=np.int64(args.ss_res),
+            )
+            counts = {
+                name: int(grid.sum())
+                for name, grid in voxel_diagnostics.items()
+            }
+            print(
+                f"[wt] wrote voxel diagnostics: {voxel_npz_path} "
+                f"(occupied={counts})"
+            )
         print(
             f"[wt] v4_ray_fill: {n_vox:,} voxels (sent to TRELLIS.2: "
             f"{coords_xyz.shape[0]:,})"

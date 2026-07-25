@@ -87,8 +87,10 @@ def v4_ray_fill(
     res: int = 64,
     ray_steps: int = 4,
     close_iters: int = 1,
+    fill_holes: bool = True,
     max_voxels: int | None = None,
     seed: int = 0,
+    diagnostics: dict[str, np.ndarray] | None = None,
 ) -> tuple[np.ndarray, int]:
     """``ours_v4`` voxelisation: ray-densify → canonicalise → close → fill.
 
@@ -103,9 +105,12 @@ def v4_ray_fill(
             :func:`expand_cloud_ray_xyz`).
         close_iters: ``scipy.ndimage.binary_closing`` iterations.  Default
             1 (heals 1-cell pinholes).
+        fill_holes: fill enclosed regions after closing.  Defaults to True.
         max_voxels: optional random subsample cap.  ``None`` (default)
             disables it.
         seed: RNG seed for the optional subsample.
+        diagnostics: optional dict populated with the quantized, closed, and
+            final voxel grids for attribution/debugging.
 
     Returns:
         ``(coords, n_voxels)``: ``(M, 3) int32`` coords in ``[0, res-1]``
@@ -127,9 +132,16 @@ def v4_ray_fill(
     if cloud_canon.size == 0:
         return np.empty((0, 3), dtype=np.int32), 0
     grid = _xyz_to_grid(cloud_canon, res)
+    if diagnostics is not None:
+        diagnostics["grid_quantized"] = grid.copy()
     if close_iters > 0:
         grid = ndi.binary_closing(grid, iterations=int(close_iters))
-    grid = ndi.binary_fill_holes(grid)
+    if diagnostics is not None:
+        diagnostics["grid_closed"] = grid.copy()
+    if fill_holes:
+        grid = ndi.binary_fill_holes(grid)
+    if diagnostics is not None:
+        diagnostics["grid_final"] = grid.copy()
     coords = _grid_to_coords(grid)
     n_raw = int(coords.shape[0])
     if max_voxels is not None and n_raw > max_voxels:
