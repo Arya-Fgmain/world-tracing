@@ -104,6 +104,12 @@ def main():
         help="Optional .rrd path to also dump the multilayer point cloud.",
     )
     p.add_argument(
+        "--npz",
+        type=Path,
+        default=None,
+        help="Optional .npz path to save raw multilayer XYZ and masks.",
+    )
+    p.add_argument(
         "--seed",
         type=int,
         default=None,
@@ -233,6 +239,11 @@ def main():
             if args.rrd is not None
             else None
         )
+        npz_path = (
+            _seed_path(args.npz, seed, len(seeds))
+            if args.npz is not None
+            else None
+        )
         print(f"\n[wt] === seed {seed} ===")
 
         torch.manual_seed(seed)
@@ -254,6 +265,17 @@ def main():
         print(
             f"[wt] predicted XYZ {xyz_np.shape}, valid frac={mask_np.mean():.2%}"
         )
+
+        if npz_path is not None:
+            npz_path.parent.mkdir(parents=True, exist_ok=True)
+            np.savez_compressed(
+                npz_path,
+                xyz=xyz_np,
+                mask=mask_np,
+                seed=np.int64(seed),
+                image=np.array(str(args.image)),
+            )
+            print(f"[wt] wrote raw multilayer prediction: {npz_path}")
 
         if rrd_path is not None:
             from wt.viz import init_recording, log_prediction, save_rrd
