@@ -381,7 +381,11 @@ def main():
             coords_xyz,
             seed=seed,
             pipeline_type=args.pipeline_type,
-            preprocess_image=False,  # rgba is already alpha-matted
+            # TRELLIS preprocessing also crops/recentres the alpha-matted
+            # object and premultiplies it onto the conditioning background.
+            # Skipping it gives Stage 2/3 a different image distribution
+            # from native TRELLIS.2.
+            preprocess_image=True,
         )
         mesh = meshes[0]
 

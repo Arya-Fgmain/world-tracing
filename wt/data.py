@@ -220,8 +220,11 @@ def load_rgba_image(
 ) -> np.ndarray:
     """Load an image as ``uint8 H×W×4`` RGBA.
 
-    For images that already carry an alpha channel, the alpha is used
-    verbatim — no model is loaded.
+    For images that carry a meaningful alpha channel, the alpha is used
+    verbatim.  An RGBA image whose alpha is fully opaque is treated like
+    an RGB image when ``auto_alpha=True``: opaque-alpha PNGs are commonly
+    exported from already-composited images and otherwise make the entire
+    background look like foreground geometry.
 
     For RGB images (no alpha channel), the behaviour depends on
     ``auto_alpha``:
@@ -239,8 +242,16 @@ def load_rgba_image(
     """
     pil = Image.open(str(path))
     if pil.mode == "RGBA":
-        return np.array(pil)
-    rgb = np.array(pil.convert("RGB"))
+        rgba = np.array(pil)
+        if not auto_alpha or np.any(rgba[:, :, 3] != 255):
+            return rgba
+        print(
+            "[wt] RGBA input has a fully-opaque alpha channel; treating it "
+            "as RGB and estimating foreground alpha."
+        )
+        rgb = rgba[:, :, :3]
+    else:
+        rgb = np.array(pil.convert("RGB"))
 
     if auto_alpha:
         # Fast path: near-white background heuristic.  Skips loading
