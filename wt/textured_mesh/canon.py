@@ -22,12 +22,13 @@ class CanonicalTransform:
 
     The forward map is::
 
-        (x, y, z)_cam  →  (x, z, -y)_canonical_zup
+        (x, y, z)_cam  →  (x, -z, -y)_canonical_zup
         v_canon = (R @ v_cam - centroid) * scale
 
     so that the cloud lands inside ``[-half_target, half_target]^3`` ⊂
     ``[-0.5, 0.5]^3`` with its "front" (smallest ``z_cam``) facing the
-    TRELLIS yaw=0 camera.
+    TRELLIS yaw=0 camera at canonical ``+Y``.  Consequently camera depth
+    must map to canonical ``-Y``.
 
     Attributes:
         centroid: ``(3,)`` translation in canonical space (applied AFTER
@@ -43,7 +44,7 @@ class CanonicalTransform:
 
     def _apply_axis_map(self, xyz: np.ndarray) -> np.ndarray:
         if self.axis_map == "cam2canonical_zup":
-            return np.stack([xyz[..., 0], xyz[..., 2], -xyz[..., 1]], axis=-1)
+            return np.stack([xyz[..., 0], -xyz[..., 2], -xyz[..., 1]], axis=-1)
         if self.axis_map in ("identity", None):
             return xyz.copy()
         if self.axis_map == "y_flip":
@@ -111,7 +112,7 @@ def canon_inverse(
     v = np.asarray(v_canon, dtype=np.float64)
     v = v / float(tf.scale) + tf.centroid[None, :].astype(np.float64)
     if tf.axis_map == "cam2canonical_zup":
-        v_cam = np.stack([v[..., 0], -v[..., 2], v[..., 1]], axis=-1)
+        v_cam = np.stack([v[..., 0], -v[..., 2], -v[..., 1]], axis=-1)
     elif tf.axis_map in ("identity", None):
         v_cam = v
     elif tf.axis_map == "y_flip":
