@@ -264,7 +264,12 @@ python examples/infer_textured_mesh.py \
 
 The ``3`` in curated bookkeeping must not be treated as proof that WT
 diffusion itself used literal seed 3.  This finding is artifact-specific and
-does not change the global default seed policy.
+does not change the global default seed policy.  The same operating rule was
+independently validated on released ``obj015_wooden_train``: WT seed ``0``
+with TRELLIS.2 seed ``5`` reached normalized mesh F-scores ``0.917`` at
+distance ``0.02`` and ``0.989`` at ``0.05`` against the official GLB.  These
+two samples support independent seed controls; they do not prove what every
+curated suffix meant in the authors' internal pipeline.
 
 ## Checkpoint handling
 
