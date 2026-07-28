@@ -160,14 +160,30 @@ def main():
         ),
     )
     p.add_argument(
-        "--bg-color", type=str, default="0,0,0", help="RGB or 'none' for background fill"
+        "--bg-color",
+        type=str,
+        default="128,128,128",
+        help=(
+            "RGB or 'none' for background fill (default: 128,128,128, "
+            "matching the released object-inference path)."
+        ),
     )
     p.add_argument("--auto-alpha", action="store_true", default=True)
     p.add_argument(
         "--no-auto-alpha", dest="auto_alpha", action="store_false"
     )
-    p.add_argument("--alpha-erode", type=int, default=2)
-    p.add_argument("--center-crop", action="store_true", default=True)
+    p.add_argument(
+        "--alpha-erode",
+        type=int,
+        default=0,
+        help="Foreground-mask erosion (default: 0, matching object inference).",
+    )
+    p.add_argument(
+        "--center-crop",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Use the training-style object-centred crop (default: enabled).",
+    )
 
     p.add_argument(
         "--pipeline-type",
@@ -321,6 +337,19 @@ def main():
                 mask=mask_np,
                 seed=np.int64(seed),
                 image=np.array(str(args.image)),
+                config=np.array(args.config),
+                checkpoint=np.array(args.ckpt),
+                auto_alpha=np.bool_(args.auto_alpha),
+                alpha_erode=np.int64(args.alpha_erode),
+                center_crop=np.bool_(args.center_crop),
+                bg_color=np.array(args.bg_color),
+                preprocessed_rgb=np.clip(
+                    rgb_t[0].permute(1, 2, 0).float().cpu().numpy() * 255.0,
+                    0.0,
+                    255.0,
+                ).astype(np.uint8),
+                input_mask=mask_t[0, 0].cpu().numpy().astype(bool),
+                intrinsics=intr_t[0].float().cpu().numpy(),
             )
             print(f"[wt] wrote raw multilayer prediction: {npz_path}")
 
@@ -383,6 +412,10 @@ def main():
                 close_iters=np.int64(args.close_iters),
                 fill_holes=np.bool_(args.fill_holes),
                 resolution=np.int64(args.ss_res),
+                ray_steps=np.int64(args.ray_steps),
+                canonical_centroid=tf.centroid,
+                canonical_scale=np.float64(tf.scale),
+                canonical_axis_map=np.array(tf.axis_map),
             )
             counts = {
                 name: int(grid.sum())
