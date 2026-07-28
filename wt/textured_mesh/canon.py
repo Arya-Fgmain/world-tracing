@@ -34,8 +34,10 @@ class CanonicalTransform:
         centroid: ``(3,)`` translation in canonical space (applied AFTER
             the axis remap).
         scale: isotropic scale factor.
-        axis_map: ``"cam2canonical_zup"`` (default), ``"identity"`` (skip
-            the remap entirely), or ``"y_flip"`` (negate y only -- legacy).
+        axis_map: ``"cam2canonical_zup"`` (depth maps to canonical ``-Y``),
+            ``"cam2canonical_zup_upstream"`` (the authors' original mapping,
+            where depth maps to canonical ``+Y``), ``"identity"`` (skip the
+            remap entirely), or ``"y_flip"`` (negate y only -- legacy).
     """
 
     centroid: np.ndarray  # (3,) -- applied AFTER axis remap
@@ -45,6 +47,8 @@ class CanonicalTransform:
     def _apply_axis_map(self, xyz: np.ndarray) -> np.ndarray:
         if self.axis_map == "cam2canonical_zup":
             return np.stack([xyz[..., 0], -xyz[..., 2], -xyz[..., 1]], axis=-1)
+        if self.axis_map == "cam2canonical_zup_upstream":
+            return np.stack([xyz[..., 0], xyz[..., 2], -xyz[..., 1]], axis=-1)
         if self.axis_map in ("identity", None):
             return xyz.copy()
         if self.axis_map == "y_flip":
@@ -113,6 +117,8 @@ def canon_inverse(
     v = v / float(tf.scale) + tf.centroid[None, :].astype(np.float64)
     if tf.axis_map == "cam2canonical_zup":
         v_cam = np.stack([v[..., 0], -v[..., 2], -v[..., 1]], axis=-1)
+    elif tf.axis_map == "cam2canonical_zup_upstream":
+        v_cam = np.stack([v[..., 0], -v[..., 2], v[..., 1]], axis=-1)
     elif tf.axis_map in ("identity", None):
         v_cam = v
     elif tf.axis_map == "y_flip":

@@ -116,6 +116,30 @@ def main():
         help="Optional .npz path to save voxel grids before/after morphology.",
     )
     p.add_argument(
+        "--canonical-axis-map",
+        choices=(
+            "cam2canonical_zup",
+            "cam2canonical_zup_upstream",
+            "identity",
+            "y_flip",
+        ),
+        default="cam2canonical_zup",
+        help=(
+            "Camera-to-TRELLIS axis mapping. Use "
+            "'cam2canonical_zup_upstream' to reproduce the authors' original "
+            "(x, y, z) -> (x, z, -y) bridge."
+        ),
+    )
+    p.add_argument(
+        "--trellis-preprocess-image",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help=(
+            "Let TRELLIS.2 crop/recenter the conditioning image. Disable this "
+            "to reproduce the authors' original textured-mesh script."
+        ),
+    )
+    p.add_argument(
         "--seed",
         type=int,
         default=None,
@@ -333,7 +357,11 @@ def main():
                 f"[wt] seed {seed}: empty point cloud -- skipping voxelisation."
             )
             continue
-        tf = compute_canonical_transform(cloud_cam, half_target=0.45)
+        tf = compute_canonical_transform(
+            cloud_cam,
+            half_target=0.45,
+            axis_map=args.canonical_axis_map,
+        )
         voxel_diagnostics = {} if voxel_npz_path is not None else None
         coords_xyz, n_vox = v4_ray_fill(
             xyz_np,
@@ -381,11 +409,7 @@ def main():
             coords_xyz,
             seed=seed,
             pipeline_type=args.pipeline_type,
-            # TRELLIS preprocessing also crops/recentres the alpha-matted
-            # object and premultiplies it onto the conditioning background.
-            # Skipping it gives Stage 2/3 a different image distribution
-            # from native TRELLIS.2.
-            preprocess_image=True,
+            preprocess_image=args.trellis_preprocess_image,
         )
         mesh = meshes[0]
 
