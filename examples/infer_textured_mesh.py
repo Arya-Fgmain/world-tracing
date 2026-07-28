@@ -37,6 +37,12 @@ You may also pass ``--rrd path.rrd`` to additionally dump the predicted
 multilayer point cloud for sanity checking inside Rerun (single-seed
 inference only; the multi-seed sweep emits ``path_seed{N}.rrd`` for each
 seed when this flag is set).
+
+WT diffusion and TRELLIS.2 sampling are independently stochastic.  By default
+the script reuses each WT ``--seed`` for TRELLIS.2, preserving the original
+single-seed behavior.  Pass ``--trellis-seed M`` to hold the downstream seed
+fixed independently; controlled experiments should record both values rather
+than infer WT RNG state from a curated artifact name.
 """
 
 from __future__ import annotations
@@ -186,7 +192,8 @@ def main():
         type=int,
         default=None,
         help=(
-            "Run a single deterministic seed.  When neither ``--seed`` nor "
+            "Run a single deterministic WT diffusion seed. Unless "
+            "--trellis-seed is set, TRELLIS.2 reuses it. When neither --seed nor "
             "``--num-seeds`` is set, the script runs the default 4-seed "
             "sweep and writes ``<out_stem>_seed{N}.glb`` for each seed."
         ),
@@ -196,9 +203,10 @@ def main():
         type=int,
         default=None,
         help=(
-            "Number of independent TRELLIS.2 / diffusion seeds (default: 4 "
+            "Number of consecutive WT diffusion seeds (default: 4 "
             "when neither ``--seed`` nor ``--num-seeds`` is set).  Each "
-            "seed produces its own GLB."
+            "WT seed produces its own GLB; TRELLIS either reuses it or uses "
+            "the fixed --trellis-seed override."
         ),
     )
     p.add_argument(
@@ -314,7 +322,10 @@ def main():
     cudnn_tf32 = bool(torch.backends.cudnn.allow_tf32)
     print(
         f"[wt] config={args.config}, device={device}, "
-        f"seeds={seeds} ({len(seeds)} sample{'s' if len(seeds) > 1 else ''}), "
+        f"WT seeds={seeds} "
+        f"({len(seeds)} sample{'s' if len(seeds) > 1 else ''}), "
+        f"TRELLIS seed="
+        f"{args.trellis_seed if args.trellis_seed is not None else 'reuse WT'}, "
         f"autocast={args.autocast_dtype}, "
         f"TF32(matmul={matmul_tf32}, cudnn={cudnn_tf32}), "
         f"wt_only={args.wt_only}"
@@ -388,7 +399,10 @@ def main():
             if args.voxel_npz is not None
             else None
         )
-        print(f"\n[wt] === seed {seed} ===")
+        print(
+            f"\n[wt] === WT seed {seed}; "
+            f"TRELLIS seed {trellis_seed} ==="
+        )
 
         torch.manual_seed(seed)
         if device.type == "cuda":

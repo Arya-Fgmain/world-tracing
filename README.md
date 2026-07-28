@@ -241,6 +241,31 @@ run a single seed and write to the plain ``--out`` path.  ``--rrd``
 additionally dumps the multilayer point cloud for sanity-check viewing
 in Rerun.
 
+WT geometry diffusion and TRELLIS.2 shape/texture sampling are separate
+stochastic stages.  ``--seed N`` selects the WT diffusion seed.
+``--trellis-seed M`` optionally selects a fixed downstream TRELLIS.2 seed;
+when it is omitted, TRELLIS.2 reuses each WT seed for backward compatibility.
+Record both values explicitly in controlled experiments instead of inferring a
+WT seed from a curated sample name.
+
+For this fork's released `obj014_leather_briefcase` regression, the curated
+geometry is closely reproduced by WT seed ``0`` with TRELLIS.2 seed ``3``:
+
+```bash
+python examples/infer_textured_mesh.py \
+    --image examples/test_images/object/obj014_leather_briefcase.png \
+    --ckpt r75b \
+    --config r75b \
+    --seed 0 \
+    --trellis-seed 3 \
+    --out /tmp/wt_obj014_wt0_trellis3.glb \
+    --trellis2-path /path/to/TRELLIS.2
+```
+
+The ``3`` in curated bookkeeping must not be treated as proof that WT
+diffusion itself used literal seed 3.  This finding is artifact-specific and
+does not change the global default seed policy.
+
 ## Checkpoint handling
 
 `--ckpt` accepts any of:

@@ -174,7 +174,8 @@ def main() -> None:
 
     print(
         "Run: "
-        f"seed={run_metadata['seed']}, "
+        f"WT seed={run_metadata['seed']}, "
+        f"TRELLIS seed={run_metadata['trellis_seed']}, "
         f"autocast={run_metadata['autocast_dtype']}, "
         f"steps={run_metadata['num_steps']}, "
         f"TF32(matmul={run_metadata['matmul_allow_tf32']}, "
