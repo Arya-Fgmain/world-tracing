@@ -42,6 +42,7 @@ seed when this flag is set).
 from __future__ import annotations
 
 import argparse
+from contextlib import nullcontext
 import hashlib
 from pathlib import Path
 
@@ -123,6 +124,38 @@ def main():
             "Hash the resolved checkpoint and store the digest in raw NPZ "
             "diagnostics. This reads the full checkpoint once."
         ),
+    )
+    p.add_argument(
+        "--wt-only",
+        action="store_true",
+        help=(
+            "Stop after saving raw WT XYZ/RRD outputs. This skips voxelization "
+            "and does not load TRELLIS.2; use --npz and/or --rrd with this mode."
+        ),
+    )
+    p.add_argument(
+        "--autocast-dtype",
+        choices=("bfloat16", "float32"),
+        default="bfloat16",
+        help=(
+            "Precision for the outer WT inference autocast context. 'float32' "
+            "disables outer autocast (default: bfloat16 on CUDA)."
+        ),
+    )
+    p.add_argument(
+        "--allow-tf32",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help=(
+            "Explicitly enable/disable CUDA TF32 for matmul and cuDNN. "
+            "By default, preserve PyTorch's current settings."
+        ),
+    )
+    p.add_argument(
+        "--num-steps",
+        type=int,
+        default=None,
+        help="Override the config's WT diffusion-step count.",
     )
     p.add_argument(
         "--canonical-axis-map",
@@ -258,12 +291,24 @@ def main():
         help="Target face count after decimation (default: 1M).",
     )
     args = p.parse_args()
+    if args.wt_only and args.npz is None and args.rrd is None:
+        p.error("--wt-only requires --npz and/or --rrd")
+    if args.num_steps is not None and args.num_steps < 1:
+        p.error("--num-steps must be at least 1")
 
     seeds = resolve_seeds(args)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if device.type == "cuda" and args.allow_tf32 is not None:
+        torch.backends.cuda.matmul.allow_tf32 = args.allow_tf32
+        torch.backends.cudnn.allow_tf32 = args.allow_tf32
+    matmul_tf32 = bool(torch.backends.cuda.matmul.allow_tf32)
+    cudnn_tf32 = bool(torch.backends.cudnn.allow_tf32)
     print(
         f"[wt] config={args.config}, device={device}, "
-        f"seeds={seeds} ({len(seeds)} sample{'s' if len(seeds) > 1 else ''})"
+        f"seeds={seeds} ({len(seeds)} sample{'s' if len(seeds) > 1 else ''}), "
+        f"autocast={args.autocast_dtype}, "
+        f"TF32(matmul={matmul_tf32}, cudnn={cudnn_tf32}), "
+        f"wt_only={args.wt_only}"
     )
 
     resolved_ckpt = Path(resolve_ckpt_path(args.ckpt)).resolve()
@@ -279,6 +324,10 @@ def main():
     model, cfg = build_model_and_load_ckpt(
         args.config, str(resolved_ckpt), device
     )
+    inference_kwargs = dict(cfg["inference_kwargs"])
+    if args.num_steps is not None:
+        inference_kwargs["num_steps"] = args.num_steps
+    print(f"[wt] diffusion steps: {inference_kwargs['num_steps']}")
     rgba = load_rgba_image(args.image, auto_alpha=args.auto_alpha)
     print(f"[wt] input image: {rgba.shape}")
     bg_color = parse_bg_color(args.bg_color)
@@ -293,23 +342,22 @@ def main():
     rgb_t = rgb_t.to(device)
     mask_t = mask_t.to(device)
     intr_t = intr_t.to(device)
-    autocast_ctx = (
-        torch.autocast(device_type="cuda", dtype=torch.bfloat16)
-        if device.type == "cuda"
-        else torch.autocast(device_type="cpu", enabled=False)
-    )
+    if args.wt_only:
+        pipeline = None
+        pil_rgba = None
+        print("[wt] WT-only mode: TRELLIS.2 loading and voxelization are disabled.")
+    else:
+        print(f"[wt] loading TRELLIS.2 pipeline ({args.trellis2_model}) ...")
+        pipeline = load_trellis2_pipeline(
+            model_id=args.trellis2_model,
+            device=device,
+            trellis2_path=args.trellis2_path,
+            attn_backend=args.attn_backend,
+        )
 
-    print(f"[wt] loading TRELLIS.2 pipeline ({args.trellis2_model}) ...")
-    pipeline = load_trellis2_pipeline(
-        model_id=args.trellis2_model,
-        device=device,
-        trellis2_path=args.trellis2_path,
-        attn_backend=args.attn_backend,
-    )
+        from PIL import Image
 
-    from PIL import Image
-
-    pil_rgba = Image.fromarray(rgba, mode="RGBA")
+        pil_rgba = Image.fromarray(rgba, mode="RGBA")
 
     for seed in seeds:
         glb_path = _seed_path(args.out, seed, len(seeds))
@@ -334,6 +382,11 @@ def main():
         if device.type == "cuda":
             torch.cuda.manual_seed(seed)
         print("[wt] running diffusion sampling ...")
+        autocast_ctx = (
+            torch.autocast(device_type="cuda", dtype=torch.bfloat16)
+            if device.type == "cuda" and args.autocast_dtype == "bfloat16"
+            else nullcontext()
+        )
         with torch.no_grad(), autocast_ctx, _bypass_activation_checkpointing(model):
             xyz_pred, mask_pred, _ = inference_diffusion(
                 model,
@@ -342,7 +395,7 @@ def main():
                 use_gt_mask=True,
                 intrinsics=intr_t,
                 invalid_fill_mode="noise",
-                **cfg["inference_kwargs"],
+                **inference_kwargs,
             )
         xyz_np = xyz_pred[0].float().cpu().numpy()
         mask_np = mask_pred[0].cpu().numpy().astype(bool)
@@ -363,6 +416,10 @@ def main():
                 checkpoint_resolved=np.array(str(resolved_ckpt)),
                 checkpoint_size=np.int64(resolved_ckpt.stat().st_size),
                 checkpoint_sha256=np.array(checkpoint_sha256),
+                autocast_dtype=np.array(args.autocast_dtype),
+                matmul_allow_tf32=np.bool_(matmul_tf32),
+                cudnn_allow_tf32=np.bool_(cudnn_tf32),
+                num_steps=np.int64(inference_kwargs["num_steps"]),
                 auto_alpha=np.bool_(args.auto_alpha),
                 alpha_erode=np.int64(args.alpha_erode),
                 center_crop=np.bool_(args.center_crop),
@@ -403,6 +460,10 @@ def main():
             )
             save_rrd(rec, rrd_path)
             print(f"[wt] wrote {rrd_path}")
+
+        if args.wt_only:
+            print(f"[wt] seed {seed}: WT-only output complete.")
+            continue
 
         cloud_cam = aggregate_camera_cloud(xyz_np, mask_np)
         if cloud_cam.size == 0:
