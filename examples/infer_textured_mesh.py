@@ -202,6 +202,15 @@ def main():
         ),
     )
     p.add_argument(
+        "--trellis-seed",
+        type=int,
+        default=None,
+        help=(
+            "Use a fixed TRELLIS.2 seed independent of the WT diffusion seed. "
+            "By default, each sample's WT seed is reused for TRELLIS.2."
+        ),
+    )
+    p.add_argument(
         "--bg-color",
         type=str,
         default="128,128,128",
@@ -360,6 +369,9 @@ def main():
         pil_rgba = Image.fromarray(rgba, mode="RGBA")
 
     for seed in seeds:
+        trellis_seed = (
+            args.trellis_seed if args.trellis_seed is not None else seed
+        )
         glb_path = _seed_path(args.out, seed, len(seeds))
         rrd_path = (
             _seed_path(args.rrd, seed, len(seeds))
@@ -420,6 +432,7 @@ def main():
                 matmul_allow_tf32=np.bool_(matmul_tf32),
                 cudnn_allow_tf32=np.bool_(cudnn_tf32),
                 num_steps=np.int64(inference_kwargs["num_steps"]),
+                trellis_seed=np.int64(trellis_seed),
                 auto_alpha=np.bool_(args.auto_alpha),
                 alpha_erode=np.int64(args.alpha_erode),
                 center_crop=np.bool_(args.center_crop),
@@ -520,13 +533,14 @@ def main():
             continue
 
         print(
-            f"[wt] running TRELLIS.2 ({args.pipeline_type}, seed={seed}) ..."
+            f"[wt] running TRELLIS.2 "
+            f"({args.pipeline_type}, seed={trellis_seed}) ..."
         )
         meshes = inject_coords_into_trellis2(
             pipeline,
             pil_rgba,
             coords_xyz,
-            seed=seed,
+            seed=trellis_seed,
             pipeline_type=args.pipeline_type,
             preprocess_image=args.trellis_preprocess_image,
         )

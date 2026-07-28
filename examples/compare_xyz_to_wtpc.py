@@ -92,6 +92,7 @@ def main() -> None:
                 "matmul_allow_tf32",
                 "cudnn_allow_tf32",
                 "num_steps",
+                "trellis_seed",
             )
         }
 
