@@ -128,9 +128,13 @@ def v4_ray_fill(
         return np.empty((0, 3), dtype=np.int32), 0
     cloud_canon = canon_apply(cloud_cam)
     in_bb = np.all(np.abs(cloud_canon) <= 0.5 - 1e-6, axis=1)
+    cloud_cam = cloud_cam[in_bb]
     cloud_canon = cloud_canon[in_bb]
     if cloud_canon.size == 0:
         return np.empty((0, 3), dtype=np.int32), 0
+    if diagnostics is not None:
+        diagnostics["points_camera_prequant"] = cloud_cam.copy()
+        diagnostics["points_canonical_prequant"] = cloud_canon.copy()
     grid = _xyz_to_grid(cloud_canon, res)
     if diagnostics is not None:
         diagnostics["grid_quantized"] = grid.copy()
@@ -187,9 +191,13 @@ def point_cloud_fill(
 
     cloud_canon = canon_apply(cloud_cam)
     in_bb = np.all(np.abs(cloud_canon) <= 0.5 - 1e-6, axis=1)
+    cloud_cam = cloud_cam[in_bb]
     cloud_canon = cloud_canon[in_bb]
     if cloud_canon.size == 0:
         return np.empty((0, 3), dtype=np.int32), 0
+    if diagnostics is not None:
+        diagnostics["points_camera_prequant"] = cloud_cam.copy()
+        diagnostics["points_canonical_prequant"] = cloud_canon.copy()
 
     grid = _xyz_to_grid(cloud_canon, res)
     if diagnostics is not None:

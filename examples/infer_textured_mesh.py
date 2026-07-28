@@ -42,13 +42,14 @@ seed when this flag is set).
 from __future__ import annotations
 
 import argparse
+import hashlib
 from pathlib import Path
 
 import numpy as np
 import torch
 
 from wt import inference_diffusion
-from wt.checkpoint import build_model_and_load_ckpt
+from wt.checkpoint import build_model_and_load_ckpt, resolve_ckpt_path
 from wt.cli import parse_bg_color, resolve_seeds
 from wt.data import load_rgba_image, preprocess_rgba_for_model
 from wt.inference import _bypass_activation_checkpointing
@@ -114,6 +115,14 @@ def main():
         type=Path,
         default=None,
         help="Optional .npz path to save voxel grids before/after morphology.",
+    )
+    p.add_argument(
+        "--checkpoint-sha256",
+        action="store_true",
+        help=(
+            "Hash the resolved checkpoint and store the digest in raw NPZ "
+            "diagnostics. This reads the full checkpoint once."
+        ),
     )
     p.add_argument(
         "--canonical-axis-map",
@@ -257,7 +266,19 @@ def main():
         f"seeds={seeds} ({len(seeds)} sample{'s' if len(seeds) > 1 else ''})"
     )
 
-    model, cfg = build_model_and_load_ckpt(args.config, args.ckpt, device)
+    resolved_ckpt = Path(resolve_ckpt_path(args.ckpt)).resolve()
+    checkpoint_sha256 = ""
+    if args.checkpoint_sha256:
+        print(f"[wt] hashing checkpoint: {resolved_ckpt}")
+        digest = hashlib.sha256()
+        with resolved_ckpt.open("rb") as checkpoint_file:
+            for chunk in iter(lambda: checkpoint_file.read(16 * 1024 * 1024), b""):
+                digest.update(chunk)
+        checkpoint_sha256 = digest.hexdigest()
+        print(f"[wt] checkpoint sha256: {checkpoint_sha256}")
+    model, cfg = build_model_and_load_ckpt(
+        args.config, str(resolved_ckpt), device
+    )
     rgba = load_rgba_image(args.image, auto_alpha=args.auto_alpha)
     print(f"[wt] input image: {rgba.shape}")
     bg_color = parse_bg_color(args.bg_color)
@@ -339,6 +360,9 @@ def main():
                 image=np.array(str(args.image)),
                 config=np.array(args.config),
                 checkpoint=np.array(args.ckpt),
+                checkpoint_resolved=np.array(str(resolved_ckpt)),
+                checkpoint_size=np.int64(resolved_ckpt.stat().st_size),
+                checkpoint_sha256=np.array(checkpoint_sha256),
                 auto_alpha=np.bool_(args.auto_alpha),
                 alpha_erode=np.int64(args.alpha_erode),
                 center_crop=np.bool_(args.center_crop),
