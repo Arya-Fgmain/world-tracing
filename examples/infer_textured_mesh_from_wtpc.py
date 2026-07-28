@@ -80,7 +80,11 @@ def main() -> None:
         seed=args.seed,
         diagnostics=diagnostics,
     )
-    counts = {name: int(grid.sum()) for name, grid in diagnostics.items()}
+    counts = {
+        name: int(grid.sum())
+        for name, grid in diagnostics.items()
+        if name.startswith("grid_")
+    }
     print(f"[wtpc] occupied voxels={counts}; sent to TRELLIS.2={n_voxels:,}")
     if len(coords) == 0:
         raise RuntimeError("WTPC voxelization produced no active coordinates")

@@ -444,6 +444,7 @@ def main():
             counts = {
                 name: int(grid.sum())
                 for name, grid in voxel_diagnostics.items()
+                if name.startswith("grid_")
             }
             print(
                 f"[wt] wrote voxel diagnostics: {voxel_npz_path} "
