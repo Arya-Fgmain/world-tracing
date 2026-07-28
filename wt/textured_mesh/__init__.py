@@ -44,6 +44,7 @@ from wt.textured_mesh.pipeline import (
 )
 from wt.textured_mesh.voxelise import (
     expand_cloud_ray_xyz,
+    point_cloud_fill,
     v4_ray_fill,
 )
 
@@ -55,6 +56,7 @@ __all__ = [
     "expand_cloud_ray_xyz",
     "inject_coords_into_trellis2",
     "load_trellis2_pipeline",
+    "point_cloud_fill",
     "save_mesh_glb",
     "v4_ray_fill",
 ]

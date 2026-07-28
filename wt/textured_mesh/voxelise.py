@@ -152,7 +152,69 @@ def v4_ray_fill(
     return coords, n_raw
 
 
+def point_cloud_fill(
+    cloud_cam: np.ndarray,
+    canon_apply,
+    res: int = 64,
+    close_iters: int = 1,
+    fill_holes: bool = True,
+    max_voxels: int | None = None,
+    seed: int = 0,
+    diagnostics: dict[str, np.ndarray] | None = None,
+) -> tuple[np.ndarray, int]:
+    """Voxelise an already-flattened camera-space surface point cloud.
+
+    Released ``.wtpc`` files retain surface points but not the layer/pixel
+    correspondences required for ray interpolation. Canonicalisation,
+    quantisation, morphology, diagnostics, and optional subsampling otherwise
+    match :func:`v4_ray_fill`.
+    """
+    try:
+        import scipy.ndimage as ndi
+    except ImportError as exc:  # pragma: no cover
+        raise ImportError(
+            "point_cloud_fill requires scipy. Install with `pip install scipy`."
+        ) from exc
+
+    cloud_cam = np.asarray(cloud_cam, dtype=np.float32)
+    if cloud_cam.ndim != 2 or cloud_cam.shape[1] != 3:
+        raise ValueError(
+            f"cloud_cam must have shape (N, 3), got {cloud_cam.shape}"
+        )
+    cloud_cam = cloud_cam[np.isfinite(cloud_cam).all(axis=1)]
+    if cloud_cam.size == 0:
+        return np.empty((0, 3), dtype=np.int32), 0
+
+    cloud_canon = canon_apply(cloud_cam)
+    in_bb = np.all(np.abs(cloud_canon) <= 0.5 - 1e-6, axis=1)
+    cloud_canon = cloud_canon[in_bb]
+    if cloud_canon.size == 0:
+        return np.empty((0, 3), dtype=np.int32), 0
+
+    grid = _xyz_to_grid(cloud_canon, res)
+    if diagnostics is not None:
+        diagnostics["grid_quantized"] = grid.copy()
+    if close_iters > 0:
+        grid = ndi.binary_closing(grid, iterations=int(close_iters))
+    if diagnostics is not None:
+        diagnostics["grid_closed"] = grid.copy()
+    if fill_holes:
+        grid = ndi.binary_fill_holes(grid)
+    if diagnostics is not None:
+        diagnostics["grid_final"] = grid.copy()
+
+    coords = _grid_to_coords(grid)
+    n_raw = int(coords.shape[0])
+    if max_voxels is not None and n_raw > max_voxels:
+        sel = np.random.RandomState(int(seed)).choice(
+            n_raw, int(max_voxels), replace=False
+        )
+        coords = coords[sel]
+    return coords, n_raw
+
+
 __all__ = [
     "expand_cloud_ray_xyz",
+    "point_cloud_fill",
     "v4_ray_fill",
 ]
