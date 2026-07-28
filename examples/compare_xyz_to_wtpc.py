@@ -19,8 +19,8 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def load_wtpc_points(path: Path) -> np.ndarray:
-    """Read positions from a static WTPC without importing the model package."""
+def load_wtpc(path: Path) -> tuple[np.ndarray, np.ndarray | None]:
+    """Read positions/colors from a static WTPC without importing the model."""
     raw = path.read_bytes()
     if len(raw) < 16 or raw[:4] != b"WTPC" or raw[5] != 0:
         raise ValueError(f"Expected a static WTPC file: {path}")
@@ -32,9 +32,23 @@ def load_wtpc_points(path: Path) -> np.ndarray:
     positions_end = offset + count * 3 * np.dtype("<f4").itemsize
     if len(raw) < positions_end:
         raise ValueError(f"Truncated WTPC positions: {path}")
-    return np.frombuffer(
+    points = np.frombuffer(
         raw, dtype="<f4", count=count * 3, offset=offset
     ).reshape(count, 3).copy()
+    colors = None
+    remaining = len(raw) - positions_end
+    if remaining == count * 3:
+        colors = np.frombuffer(
+            raw,
+            dtype=np.uint8,
+            count=count * 3,
+            offset=positions_end,
+        ).reshape(count, 3).copy()
+    elif remaining != 0:
+        raise ValueError(
+            f"Unsupported WTPC trailing payload: {remaining} bytes in {path}"
+        )
+    return points, colors
 
 
 def fit_similarity(source: np.ndarray, target: np.ndarray):
@@ -81,6 +95,11 @@ def main() -> None:
     with np.load(args.xyz) as data:
         xyz = data["xyz"].astype(np.float64)
         mask = data["mask"].astype(bool)
+        preprocessed_rgb = (
+            data["preprocessed_rgb"].astype(np.uint8)
+            if "preprocessed_rgb" in data
+            else None
+        )
         run_metadata = {
             name: optional_npz_scalar(data, name)
             for name in (
@@ -103,7 +122,8 @@ def main() -> None:
 
     local_layers = [xyz[layer][mask[layer]] for layer in range(len(xyz))]
     counts = [len(points) for points in local_layers]
-    author = load_wtpc_points(args.author_wtpc).astype(np.float64)
+    author_points, author_colors = load_wtpc(args.author_wtpc)
+    author = author_points.astype(np.float64)
     if sum(counts) != len(author):
         raise ValueError(
             "Ordered comparison requires matching point counts: "
@@ -151,6 +171,35 @@ def main() -> None:
         "per_layer_correspondence_error": per_layer,
         "hidden_layer_p90_mean": hidden_p90_mean,
     }
+    if author_colors is not None and preprocessed_rgb is not None:
+        color_agreement_by_layer = []
+        for layer in range(len(mask)):
+            local_colors = preprocessed_rgb[mask[layer]]
+            reference_colors = author_colors[
+                offsets[layer] : offsets[layer + 1]
+            ]
+            color_difference = np.abs(
+                local_colors.astype(np.int16) - reference_colors.astype(np.int16)
+            )
+            color_agreement_by_layer.append(
+                {
+                    "layer": layer + 1,
+                    "exact_all": bool(
+                        np.array_equal(local_colors, reference_colors)
+                    ),
+                    "exact_rgb_fraction": float(
+                        np.mean(np.all(local_colors == reference_colors, axis=1))
+                    ),
+                    "mean_absolute_channel_difference": float(
+                        color_difference.mean()
+                    ),
+                    "max_absolute_channel_difference": int(
+                        color_difference.max()
+                    ),
+                }
+            )
+        metrics["ordered_color_agreement_by_layer"] = color_agreement_by_layer
+        metrics["visible_layer_color_agreement"] = color_agreement_by_layer[0]
 
     masks_identical = all(np.array_equal(mask[0], item) for item in mask[1:])
     equal_counts = len(set(counts)) == 1
@@ -196,6 +245,16 @@ def main() -> None:
             f"local median={span['local_median']:.8f}, "
             f"author median={span['author_median']:.8f}, "
             f"correlation={span['pearson_correlation']:.8f}"
+        )
+    if "visible_layer_color_agreement" in metrics:
+        colors = metrics["visible_layer_color_agreement"]
+        print(
+            "Visible-layer WTPC/local colors: "
+            f"exact_all={colors['exact_all']}, "
+            f"exact_rgb_fraction={colors['exact_rgb_fraction']:.2%}, "
+            f"mean_abs_channel_diff="
+            f"{colors['mean_absolute_channel_difference']:.6f}, "
+            f"max_abs_channel_diff={colors['max_absolute_channel_difference']}"
         )
 
     if args.json is not None:
